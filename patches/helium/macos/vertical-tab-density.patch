@@ -2,10 +2,11 @@ Index: src/chrome/app/settings_strings.grdp
 ===================================================================
 --- src.orig/chrome/app/settings_strings.grdp
 +++ src/chrome/app/settings_strings.grdp
-@@ -304,6 +304,15 @@
+@@ -303,6 +303,15 @@
+     </message>
      <message name="IDS_SETTINGS_TAB_STRIP_RIGHT_ALIGN" desc="Label for the toggle that displays vertical tabs on the right side of the browser window.">
        Show vertical tabs on right side
-     </message>
++    </message>
 +    <message name="IDS_SETTINGS_VERTICAL_TAB_DENSITY" desc="Label for the dropdown that controls the spacing of vertical tabs.">
 +      Vertical tab density
 +    </message>
@@ -14,15 +15,14 @@ Index: src/chrome/app/settings_strings.grdp
 +    </message>
 +    <message name="IDS_SETTINGS_VERTICAL_TAB_DENSITY_ROOMY" desc="Roomy option in the vertical tab density dropdown.">
 +      Roomy
-+    </message>
+     </message>
      <message name="IDS_SETTINGS_CENTERED_LOCATION_BAR" desc="Label for the toggle to use a centered address bar.">
        Centered address bar
-     </message>
 Index: src/chrome/browser/extensions/api/settings_private/prefs_util.cc
 ===================================================================
 --- src.orig/chrome/browser/extensions/api/settings_private/prefs_util.cc
 +++ src/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -224,6 +224,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil
+@@ -224,6 +224,8 @@
    (*s_allowlist)[::prefs::kHeliumLayout] = settings_api::PrefType::kNumber;
    (*s_allowlist)[::prefs::kHeliumVerticalRightAligned] =
        settings_api::PrefType::kBoolean;
@@ -35,7 +35,7 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.htm
 ===================================================================
 --- src.orig/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
 +++ src/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
-@@ -79,6 +79,16 @@ export function getHtml(this: SettingsAp
+@@ -79,6 +79,16 @@
            pref-key="helium.browser.vertical_right_aligned"
            label="$i18n{tabStripRightAlign}">
        </settings-toggle-button>
@@ -56,29 +56,21 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 ===================================================================
 --- src.orig/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-@@ -90,6 +90,13 @@ enum BrowserLayout {
+@@ -88,6 +88,13 @@
+   COMPACT = 1,
+   VERTICAL = 2,
    DYNAMIC = 3,
- }
- 
++}
++
 +// This must be kept in sync with the VerticalTabDensity enum in
 +// chrome/browser/ui/helium/vertical_tab_density.h.
 +enum VerticalTabDensity {
 +  COMPACT = 0,
 +  ROOMY = 1,
-+}
-+
+ }
+
  function normalizePageVisibility(
-     visibility: boolean|AppearancePageVisibility|
-     undefined): AppearancePageVisibility {
-@@ -142,6 +149,7 @@ export class SettingsAppearancePageEleme
- 
-       defaultFontSizePref_: {type: Object},
-       browserLayoutPref_: {type: Object},
-+      verticalTabDensityPref_: {type: Object},
-       homepageIsNewTabPagePref_: {type: Object},
-       homepagePref_: {type: Object},
-       pinContextualTaskButtonPref_: {type: Object},
-@@ -175,6 +183,7 @@ export class SettingsAppearancePageEleme
+@@ -175,6 +182,7 @@
        showManagedThemeDialog_: {type: Boolean},
        glassEffectOptions_: {type: Array},
        browserLayoutOptions_: {type: Array},
@@ -86,19 +78,13 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
        showNativeFrameMaterialsOption_: {type: Boolean},
        showGlassEffectEnabled_: {type: Boolean},
        ntpSimplificationBookmarksBarEnabled_: {type: Boolean},
-@@ -200,6 +209,8 @@ export class SettingsAppearancePageEleme
-   // Mirrored prefs.
-   protected accessor browserLayoutPref_: PrefObject<number>|undefined =
-       undefined;
-+  protected accessor verticalTabDensityPref_: PrefObject<number>|undefined =
-+      undefined;
-   protected accessor defaultFontSizePref_: PrefObject<number>|undefined =
-       undefined;
-   protected accessor homepageIsNewTabPagePref_: PrefObject<boolean>|undefined =
-@@ -283,6 +294,17 @@ export class SettingsAppearancePageEleme
-     },
-   ];
- 
+@@ -280,6 +288,17 @@
+     {
+       value: BrowserLayout.VERTICAL,
+       name: loadTimeData.getString('browserLayoutVertical'),
++    },
++  ];
++
 +  protected accessor verticalTabDensityOptions_: DropdownMenuOptionList = [
 +    {
 +      value: VerticalTabDensity.COMPACT,
@@ -107,25 +93,14 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +    {
 +      value: VerticalTabDensity.ROOMY,
 +      name: loadTimeData.getString('verticalTabDensityRoomy'),
-+    },
-+  ];
-+
-   // The values in this array must match the BookmarkBarVisibilityState enum
-   // defined in components/bookmarks/common/bookmark_bar_visibility_state.h.
-   protected accessor bookmarksBarOptions_: DropdownMenuOptionList = [
-@@ -354,6 +376,7 @@ export class SettingsAppearancePageEleme
-     this.mirrorPrefs({
-       'autogenerated.theme.policy.color': 'themePolicyColorPref_',
-       'helium.browser.layout': 'browserLayoutPref_',
-+      'helium.browser.vertical_tab_density': 'verticalTabDensityPref_',
-       'browser.pin_contextual_task_button': 'pinContextualTaskButtonPref_',
-       'browser.pin_split_tab_button': 'pinSplitTabButtonPref_',
-       'browser.show_forward_button': 'showForwardButtonPref_',
+     },
+   ];
+
 Index: src/chrome/browser/ui/BUILD.gn
 ===================================================================
 --- src.orig/chrome/browser/ui/BUILD.gn
 +++ src/chrome/browser/ui/BUILD.gn
-@@ -3639,6 +3639,7 @@ source_set("layout_constants") {
+@@ -3639,6 +3639,7 @@
    deps = [
      "//base",
      "//chrome/browser/ui:ui_features",
@@ -137,12 +112,13 @@ Index: src/chrome/browser/ui/helium/BUILD.gn
 ===================================================================
 --- src.orig/chrome/browser/ui/helium/BUILD.gn
 +++ src/chrome/browser/ui/helium/BUILD.gn
-@@ -19,3 +19,11 @@ source_set("helium_layout_state_controll
+@@ -19,3 +19,12 @@
      "//chrome/common:constants",
    ]
  }
 +
-+source_set("vertical_tab_density") {
++component("vertical_tab_density") {
++  defines = [ "IS_HELIUM_VERTICAL_TAB_DENSITY_IMPL" ]
 +  sources = [
 +    "vertical_tab_density.cc",
 +    "vertical_tab_density.h",
@@ -154,7 +130,7 @@ Index: src/chrome/browser/ui/layout_constants.cc
 --- src.orig/chrome/browser/ui/layout_constants.cc
 +++ src/chrome/browser/ui/layout_constants.cc
 @@ -6,6 +6,7 @@
- 
+
  #include "base/notreached.h"
  #include "build/build_config.h"
 +#include "chrome/browser/ui/helium/vertical_tab_density.h"
@@ -162,7 +138,7 @@ Index: src/chrome/browser/ui/layout_constants.cc
  #include "chrome/browser/ui/ui_features.h"
  #include "components/omnibox/common/omnibox_features.h"
 @@ -19,6 +20,8 @@
- 
+
  int GetLayoutConstant(LayoutConstant constant) {
    const bool touch_ui = ui::TouchUiController::Get()->touch_ui();
 +  const bool roomy_vertical_tabs =
@@ -170,7 +146,7 @@ Index: src/chrome/browser/ui/layout_constants.cc
    switch (constant) {
      case LayoutConstant::kHeliumBasePadding:
        return 3;
-@@ -151,17 +154,17 @@ int GetLayoutConstant(LayoutConstant con
+@@ -151,7 +154,7 @@
      case LayoutConstant::kVerticalTabCornerRadius:
        return 8;
      case LayoutConstant::kVerticalTabHeight:
@@ -179,11 +155,9 @@ Index: src/chrome/browser/ui/layout_constants.cc
      case LayoutConstant::kVerticalTabPinnedHeight:
        return 30;
      case LayoutConstant::kVerticalTabMinWidth:
--      return 30;
-+      return roomy_vertical_tabs ? 36 : 30;
+@@ -159,9 +162,9 @@
      case LayoutConstant::kVerticalTabStripHorizontalPadding:
--      return 6;
-+      return roomy_vertical_tabs ? 8 : 6;
+       return 6;
      case LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding:
 -      return 6;
 +      return roomy_vertical_tabs ? 8 : 6;
@@ -197,7 +171,15 @@ Index: src/chrome/browser/ui/tabs/BUILD.gn
 ===================================================================
 --- src.orig/chrome/browser/ui/tabs/BUILD.gn
 +++ src/chrome/browser/ui/tabs/BUILD.gn
-@@ -573,6 +573,7 @@ if (!is_android) {
+@@ -386,6 +386,7 @@
+       "//chrome/browser/ui/browser_window",
+       "//chrome/browser/ui/commerce",
+       "//chrome/browser/ui/helium:helium_layout_state_controller",
++      "//chrome/browser/ui/helium:vertical_tab_density",
+       "//chrome/browser/ui/send_tab_to_self",
+       "//chrome/browser/ui/thumbnails",
+       "//chrome/browser/ui/user_education",
+@@ -573,6 +574,7 @@
        "//chrome/browser/ui/context_highlight",
        "//chrome/browser/ui/contextual_search",
        "//chrome/browser/ui/helium:helium_layout_state_controller",
@@ -217,21 +199,32 @@ Index: src/chrome/browser/ui/tabs/tab_strip_prefs.cc
  #include "chrome/browser/ui/tabs/features.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
-@@ -32,6 +33,9 @@ void RegisterProfilePrefs(user_prefs::Pr
-   registry->RegisterIntegerPref(prefs::kHeliumLayout,
-                                 std::to_underlying(HeliumLayoutType::kClassic));
-   registry->RegisterBooleanPref(prefs::kHeliumVerticalRightAligned, false);
+@@ -19,6 +20,12 @@
+ #include "ui/actions/actions.h"
+
+ namespace tabs {
++
++void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
 +  registry->RegisterIntegerPref(
 +      prefs::kHeliumVerticalTabDensity,
 +      static_cast<int>(VerticalTabDensity::kCompact));
-   registry->RegisterBooleanPref(prefs::kHeliumZenMode, false);
-   registry->RegisterBooleanPref(prefs::kHeliumZenModeSidebarPinned, false);
-   registry->RegisterBooleanPref(prefs::kHeliumZenModeTopChromePinned, false);
++}
+
+ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterBooleanPref(prefs::kTabSearchPinnedToTabstrip, true);
 Index: src/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
 ===================================================================
 --- src.orig/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
 +++ src/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
-@@ -23,6 +23,7 @@
+@@ -13,6 +13,7 @@
+ #include "base/strings/to_string.h"
+ #include "base/timer/timer.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
++#include "chrome/browser/browser_process.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/session_service.h"
+ #include "chrome/browser/sessions/session_service_factory.h"
+@@ -23,6 +24,7 @@
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
  #include "chrome/browser/ui/helium/helium_layout_state_controller.h"
@@ -239,40 +232,41 @@ Index: src/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
  #include "chrome/browser/ui/tabs/features.h"
  #include "chrome/browser/ui/toasts/api/toast_id.h"
  #include "chrome/browser/ui/toasts/toast_controller.h"
-@@ -64,8 +65,15 @@ VerticalTabStripStateController::Vertica
+@@ -64,6 +66,15 @@
        pref_service_->GetInteger(prefs::kHeliumLayout) ==
        std::to_underlying(HeliumLayoutType::kVertical);
- 
-+  SetVerticalTabDensity(pref_service_->GetInteger(
-+                            prefs::kHeliumVerticalTabDensity) ==
-+                                static_cast<int>(VerticalTabDensity::kRoomy)
-+                            ? VerticalTabDensity::kRoomy
-+                            : VerticalTabDensity::kCompact);
+
++  density_pref_change_registrar_.Init(g_browser_process->local_state());
++  density_pref_change_registrar_.Add(
++      prefs::kHeliumVerticalTabDensity,
++      base::BindRepeating(&VerticalTabStripStateController::OnDensityChanged,
++                          base::Unretained(this)));
++  SetVerticalTabDensity(NormalizeVerticalTabDensity(
++      g_browser_process->local_state()->GetInteger(
++          prefs::kHeliumVerticalTabDensity)));
 +
    pref_change_registrar_.AddMultiple(
--      {prefs::kHeliumLayout, prefs::kHeliumVerticalRightAligned},
-+      {prefs::kHeliumLayout, prefs::kHeliumVerticalRightAligned,
-+       prefs::kHeliumVerticalTabDensity},
+       {prefs::kHeliumLayout, prefs::kHeliumVerticalRightAligned},
        base::BindRepeating(&VerticalTabStripStateController::OnModeChanged,
-                           base::Unretained(this)));
- 
-@@ -311,6 +319,11 @@ void VerticalTabStripStateController::No
+@@ -308,6 +319,13 @@
+ void VerticalTabStripStateController::NotifyModeChanged() {
+   UpdateCollapseActionItem();
+   on_mode_changed_callback_list_.Notify(this);
++}
++
++void VerticalTabStripStateController::OnDensityChanged() {
++  SetVerticalTabDensity(NormalizeVerticalTabDensity(
++      g_browser_process->local_state()->GetInteger(
++          prefs::kHeliumVerticalTabDensity)));
++  NotifyModeChanged();
  }
- 
+
  void VerticalTabStripStateController::OnModeChanged() {
-+  SetVerticalTabDensity(pref_service_->GetInteger(
-+                            prefs::kHeliumVerticalTabDensity) ==
-+                                static_cast<int>(VerticalTabDensity::kRoomy)
-+                            ? VerticalTabDensity::kRoomy
-+                            : VerticalTabDensity::kCompact);
-   const bool new_enabled =
-       pref_service_->GetInteger(prefs::kHeliumLayout) ==
-       std::to_underlying(HeliumLayoutType::kVertical);
 Index: src/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 ===================================================================
 --- src.orig/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ src/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -606,6 +606,9 @@ void AddAppearanceStrings(content::WebUI
+@@ -606,6 +606,9 @@
        {"browserLayoutCompact", IDS_SETTINGS_BROWSER_LAYOUT_COMPACT},
        {"browserLayoutVertical", IDS_SETTINGS_BROWSER_LAYOUT_VERTICAL},
        {"tabStripRightAlign", IDS_SETTINGS_TAB_STRIP_RIGHT_ALIGN},
@@ -286,15 +280,268 @@ Index: src/chrome/common/pref_names.h
 ===================================================================
 --- src.orig/chrome/common/pref_names.h
 +++ src/chrome/common/pref_names.h
-@@ -634,6 +634,11 @@ inline constexpr char kHeliumLayout[] =
+@@ -633,6 +633,11 @@
+ // A boolean pref set to true if vertical tabs should be on the right side.
  inline constexpr char kHeliumVerticalRightAligned[] =
      "helium.browser.vertical_right_aligned";
- 
-+// An enum (VerticalTabDensity) pref that controls the vertical tab strip
-+// density. 0 = compact (default), 1 = roomy.
++
++// A Local State enum (VerticalTabDensity) pref for vertical tab strip density.
++// 0 = compact (default), 1 = roomy.
 +inline constexpr char kHeliumVerticalTabDensity[] =
 +    "helium.browser.vertical_tab_density";
-+
+
  // A boolean pref set to true if zen mode is enabled.
  inline constexpr char kHeliumZenMode[] = "helium.browser.zen_mode";
- 
+Index: src/chrome/browser/ui/helium/vertical_tab_density.h
+===================================================================
+--- /dev/null
++++ src/chrome/browser/ui/helium/vertical_tab_density.h
+@@ -0,0 +1,37 @@
++// Copyright 2026 The Helium Authors
++// You can use, redistribute, and/or modify this source code under
++// the terms of the GPL-3.0 license that can be found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_HELIUM_VERTICAL_TAB_DENSITY_H_
++#define CHROME_BROWSER_UI_HELIUM_VERTICAL_TAB_DENSITY_H_
++
++#include "base/component_export.h"
++
++// The density of the vertical tab strip. This must be kept in sync with the
++// VerticalTabDensity enum in
++// chrome/browser/resources/settings/appearance_page/appearance_page.ts.
++enum class VerticalTabDensity {
++  kCompact = 0,
++  kRoomy = 1,
++  kMaxValue = kRoomy,
++};
++
++// Missing or invalid preference values use Compact.
++constexpr VerticalTabDensity NormalizeVerticalTabDensity(int value) {
++  return value == static_cast<int>(VerticalTabDensity::kRoomy)
++             ? VerticalTabDensity::kRoomy
++             : VerticalTabDensity::kCompact;
++}
++
++// Returns the process-wide vertical tab density. GetLayoutConstant() uses this
++// to derive vertical tab metrics. Defaults to kCompact.
++COMPONENT_EXPORT(HELIUM_VERTICAL_TAB_DENSITY)
++VerticalTabDensity GetVerticalTabDensity();
++
++// Sets the process-wide vertical tab density. This is updated by
++// VerticalTabStripStateController from the browser-wide Local State preference.
++// Every window observes the same preference, including across profiles.
++COMPONENT_EXPORT(HELIUM_VERTICAL_TAB_DENSITY)
++void SetVerticalTabDensity(VerticalTabDensity density);
++
++#endif  // CHROME_BROWSER_UI_HELIUM_VERTICAL_TAB_DENSITY_H_
+Index: src/chrome/browser/ui/helium/vertical_tab_density.cc
+===================================================================
+--- /dev/null
++++ src/chrome/browser/ui/helium/vertical_tab_density.cc
+@@ -0,0 +1,19 @@
++// Copyright 2026 The Helium Authors
++// You can use, redistribute, and/or modify this source code under
++// the terms of the GPL-3.0 license that can be found in the LICENSE file.
++
++#include "chrome/browser/ui/helium/vertical_tab_density.h"
++
++namespace {
++
++VerticalTabDensity g_vertical_tab_density = VerticalTabDensity::kCompact;
++
++}  // namespace
++
++VerticalTabDensity GetVerticalTabDensity() {
++  return g_vertical_tab_density;
++}
++
++void SetVerticalTabDensity(VerticalTabDensity density) {
++  g_vertical_tab_density = density;
++}
+Index: src/chrome/browser/prefs/browser_prefs.cc
+===================================================================
+--- src.orig/chrome/browser/prefs/browser_prefs.cc
++++ src/chrome/browser/prefs/browser_prefs.cc
+@@ -1538,6 +1538,7 @@
+   subresource_filter::IndexedRulesetVersion::RegisterPrefs(
+       registry, subresource_filter::kSafeBrowsingRulesetConfig.filter_tag);
+   SystemNetworkContextManager::RegisterPrefs(registry);
++  tabs::RegisterLocalStatePrefs(registry);
+   tracing::RegisterPrefs(registry);
+   update_client::RegisterPrefs(registry);
+   variations::VariationsService::RegisterPrefs(registry);
+Index: src/chrome/browser/ui/tabs/tab_strip_prefs.h
+===================================================================
+--- src.orig/chrome/browser/ui/tabs/tab_strip_prefs.h
++++ src/chrome/browser/ui/tabs/tab_strip_prefs.h
+@@ -9,6 +9,7 @@
+ class PrefRegistrySyncable;
+ }
+
++class PrefRegistrySimple;
+ class PrefService;
+ class BrowserWindowInterface;
+
+@@ -22,6 +23,9 @@
+
+ // Returns the default behavior per platform for tab search position.
+ bool GetDefaultTabSearchRightAligned();
++
++// Registers browser-wide vertical tab density.
++void RegisterLocalStatePrefs(PrefRegistrySimple* registry);
+
+ // Registers Tab Strip specific prefs.
+ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
+Index: src/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
+===================================================================
+--- src.orig/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
++++ src/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
+@@ -142,6 +142,7 @@
+   void NotifyModeChanged();
+
+   void OnModeChanged();
++  void OnDensityChanged();
+   void OnExpandOnHoverEnabledChanged();
+
+   // Directly sets the collapse state.
+@@ -177,6 +178,7 @@
+
+   const raw_ptr<PrefService> pref_service_;
+   PrefChangeRegistrar pref_change_registrar_;
++  PrefChangeRegistrar density_pref_change_registrar_;
+   raw_ptr<actions::ActionItem> root_action_item_;
+   raw_ptr<SessionService> session_service_;
+   const SessionID session_id_;
+Index: src/chrome/browser/ui/views/frame/browser_view.cc
+===================================================================
+--- src.orig/chrome/browser/ui/views/frame/browser_view.cc
++++ src/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1749,6 +1749,21 @@
+
+ void BrowserView::OnVerticalTabStripModeChanged(
+     tabs::VerticalTabStripStateController* controller) {
++  // `NotifyModeChanged` fires for any pref covered by the mode registrar,
++  // including the right-alignment toggle. Only reset/reinit the tab strips
++  // when the vertical-vs-horizontal state actually changes; for in-vertical
++  // property changes (e.g. right-alignment) a layout pass is sufficient.
++  const bool vertical_initialized =
++      vertical_tab_strip_region_view_->GetTabStripView() != nullptr;
++  const bool should_be_vertical = controller->ShouldDisplayVerticalTabs();
++  if (vertical_initialized == should_be_vertical) {
++    // Mode is unchanged; just re-layout so alignment-dependent views update.
++    UpdateZenCollapseButtonVisibility();
++    vertical_tab_strip_region_view_->RefreshDensity();
++    InvalidateLayout();
++    return;
++  }
++
+   // Clear selection model
+   if (auto* active_tab = browser_->GetTabStripModel()->GetActiveTab()) {
+     tabs::TabStripModelSelectionState selection_state(
+@@ -1759,21 +1774,6 @@
+         browser_->GetTabStripModel()->GetFocusedGroup());
+     browser_->GetTabStripModel()->SetSelectionFromModel(
+         std::move(selection_state));
+-  }
+-
+-  // `NotifyModeChanged` fires for any pref covered by the mode registrar,
+-  // including the right-alignment toggle. Only reset/reinit the tab strips
+-  // when the vertical-vs-horizontal state actually changes; for in-vertical
+-  // property changes (e.g. right-alignment) a layout pass is sufficient.
+-  const bool vertical_initialized =
+-      vertical_tab_strip_region_view_->GetTabStripView() != nullptr;
+-  const bool should_be_vertical = controller->ShouldDisplayVerticalTabs();
+-  if (vertical_initialized == should_be_vertical) {
+-    // Mode is unchanged; just re-layout so alignment-dependent views update.
+-    UpdateZenCollapseButtonVisibility();
+-    vertical_tab_strip_region_view_->InvalidateLayout();
+-    InvalidateLayout();
+-    return;
+   }
+
+   if (should_be_vertical) {
+Index: src/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.cc
+===================================================================
+--- src.orig/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.cc
++++ src/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.cc
+@@ -31,11 +31,14 @@
+   SetImageLabelSpacing(kBigPadding);
+   SetShouldShowLabel(true);
+   SetLabelText(l10n_util::GetStringUTF16(IDS_ACCNAME_NEWTAB));
+-  SetPreferredSize(
+-      gfx::Size(-1, GetLayoutConstant(LayoutConstant::kVerticalTabHeight)));
+ }
+
+ VerticalNewTabButton::~VerticalNewTabButton() = default;
+
++gfx::Size VerticalNewTabButton::CalculatePreferredSize(
++    const views::SizeBounds& available_size) const {
++  return gfx::Size(-1, GetLayoutConstant(LayoutConstant::kVerticalTabHeight));
++}
++
+ BEGIN_METADATA(VerticalNewTabButton)
+ END_METADATA
+Index: src/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.h
+===================================================================
+--- src.orig/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.h
++++ src/chrome/browser/ui/views/tabs/vertical/vertical_new_tab_button.h
+@@ -17,6 +17,10 @@
+  public:
+   explicit VerticalNewTabButton(BrowserWindowInterface* browser);
+   ~VerticalNewTabButton() override;
++
++ protected:
++  gfx::Size CalculatePreferredSize(
++      const views::SizeBounds& available_size) const override;
+ };
+
+ #endif  // CHROME_BROWSER_UI_VIEWS_TABS_VERTICAL_VERTICAL_NEW_TAB_BUTTON_H_
+Index: src/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+===================================================================
+--- src.orig/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
++++ src/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+@@ -86,6 +86,9 @@
+   bool IsPositionInWindowCaption(const gfx::Point& point) override;
+
+   void SetHasLeadingExclusionForLayout(bool has_leading_exclusion);
++
++  // Refresh density-dependent metrics and cached tab layouts.
++  void RefreshDensity();
+   void SetZenModeFloatingStyleForLayout(bool floating);
+
+   void UpdateInteriorMargin();
+Index: src/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+===================================================================
+--- src.orig/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ src/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -753,6 +753,17 @@
+   is_expanded_on_hover_ = false;
+ }
+
++void VerticalTabStripRegionView::RefreshDensity() {
++  UpdateInteriorMargin();
++  auto invalidate_subtree = [](auto&& self, views::View* view) -> void {
++    for (views::View* child : view->children()) {
++      self(self, child);
++    }
++    view->InvalidateLayout();
++  };
++  invalidate_subtree(invalidate_subtree, this);
++}
++
+ void VerticalTabStripRegionView::UpdateInteriorMargin() {
+   const int padding = GetLayoutConstant(
+       LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding);
+Index: src/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
+===================================================================
+--- src.orig/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
++++ src/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
+@@ -121,7 +121,7 @@
+                                                                         : 1.0f),
+       static_cast<float>(num_children));
+   const int min_height =
+-      base::ClampCeil(GetLayoutConstant(LayoutConstant::kVerticalTabHeight) *
++      base::ClampCeil(GetLayoutConstant(LayoutConstant::kVerticalTabPinnedHeight) *
+                       min_rows) +
+       (num_children > 1 ? kTabPadding : 0);
+   return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth),
