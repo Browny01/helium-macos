@@ -98,7 +98,7 @@ configure_build() {
   cd "$_src_dir"
   ___helium_install_cipd_deps
   ___helium_configure_siso
-  "$_gn_path" gen out/Default --fail-on-unused-args
+  "$_gn_path" gen "$_out_dir" --fail-on-unused-args
 }
 
 helium_build() {

@@ -8,6 +8,8 @@ for developing new Helium features.
 
 [> See docs/building.md](docs/building.md)
 
+For this personal sidebar-density fork, see [installing and upgrading the fork](docs/personal-fork.md).
+
 ## Contributing
 Before contributing to this repo, please read the guidelines in the main repo's
 [CONTRIBUTING.md](https://github.com/imputnet/helium/blob/main/CONTRIBUTING.md).
