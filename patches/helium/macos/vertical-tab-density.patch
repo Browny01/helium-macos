@@ -2,7 +2,7 @@ Index: src/chrome/app/settings_strings.grdp
 ===================================================================
 --- src.orig/chrome/app/settings_strings.grdp
 +++ src/chrome/app/settings_strings.grdp
-@@ -303,6 +303,15 @@
+@@ -303,6 +303,18 @@
      </message>
      <message name="IDS_SETTINGS_TAB_STRIP_RIGHT_ALIGN" desc="Label for the toggle that displays vertical tabs on the right side of the browser window.">
        Show vertical tabs on right side
@@ -15,6 +15,9 @@ Index: src/chrome/app/settings_strings.grdp
 +    </message>
 +    <message name="IDS_SETTINGS_VERTICAL_TAB_DENSITY_ROOMY" desc="Roomy option in the vertical tab density dropdown.">
 +      Roomy
++    </message>
++    <message name="IDS_SETTINGS_VERTICAL_TAB_DENSITY_COMFORTABLE" desc="Comfortable option between Compact and Roomy in the vertical tab density dropdown.">
++      Comfortable
      </message>
      <message name="IDS_SETTINGS_CENTERED_LOCATION_BAR" desc="Label for the toggle to use a centered address bar.">
        Centered address bar
@@ -56,7 +59,7 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 ===================================================================
 --- src.orig/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-@@ -88,6 +88,13 @@
+@@ -88,6 +88,14 @@
    COMPACT = 1,
    VERTICAL = 2,
    DYNAMIC = 3,
@@ -67,10 +70,11 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +enum VerticalTabDensity {
 +  COMPACT = 0,
 +  ROOMY = 1,
++  COMFORTABLE = 2,
  }
 
  function normalizePageVisibility(
-@@ -175,6 +182,7 @@
+@@ -175,6 +183,7 @@
        showManagedThemeDialog_: {type: Boolean},
        glassEffectOptions_: {type: Array},
        browserLayoutOptions_: {type: Array},
@@ -78,7 +82,7 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
        showNativeFrameMaterialsOption_: {type: Boolean},
        showGlassEffectEnabled_: {type: Boolean},
        ntpSimplificationBookmarksBarEnabled_: {type: Boolean},
-@@ -280,6 +288,17 @@
+@@ -280,6 +289,21 @@
      {
        value: BrowserLayout.VERTICAL,
        name: loadTimeData.getString('browserLayoutVertical'),
@@ -89,6 +93,10 @@ Index: src/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +    {
 +      value: VerticalTabDensity.COMPACT,
 +      name: loadTimeData.getString('verticalTabDensityCompact'),
++    },
++    {
++      value: VerticalTabDensity.COMFORTABLE,
++      name: loadTimeData.getString('verticalTabDensityComfortable'),
 +    },
 +    {
 +      value: VerticalTabDensity.ROOMY,
@@ -141,29 +149,28 @@ Index: src/chrome/browser/ui/layout_constants.cc
 
  int GetLayoutConstant(LayoutConstant constant) {
    const bool touch_ui = ui::TouchUiController::Get()->touch_ui();
-+  const bool roomy_vertical_tabs =
-+      GetVerticalTabDensity() == VerticalTabDensity::kRoomy;
++  const auto vertical_tab_metrics =
++      GetVerticalTabDensityMetrics(GetVerticalTabDensity());
    switch (constant) {
      case LayoutConstant::kHeliumBasePadding:
        return 3;
-@@ -151,7 +154,7 @@
+@@ -151,17 +154,15 @@
      case LayoutConstant::kVerticalTabCornerRadius:
        return 8;
      case LayoutConstant::kVerticalTabHeight:
 -      return 30;
-+      return roomy_vertical_tabs ? 40 : 30;
      case LayoutConstant::kVerticalTabPinnedHeight:
-       return 30;
+-      return 30;
++      return vertical_tab_metrics.tab_height;
      case LayoutConstant::kVerticalTabMinWidth:
-@@ -159,9 +162,9 @@
+       return 30;
      case LayoutConstant::kVerticalTabStripHorizontalPadding:
        return 6;
      case LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding:
 -      return 6;
-+      return roomy_vertical_tabs ? 8 : 6;
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
 -      return 6;
-+      return roomy_vertical_tabs ? 8 : 6;
++      return vertical_tab_metrics.vertical_padding;
      case LayoutConstant::kVerticalTabStripComboButtonIconSize:
        return 18;
      case LayoutConstant::kVerticalTabStripButtonIconSize:
@@ -266,12 +273,14 @@ Index: src/chrome/browser/ui/webui/settings/settings_localized_strings_provider.
 ===================================================================
 --- src.orig/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ src/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -606,6 +606,9 @@
+@@ -606,6 +606,11 @@
        {"browserLayoutCompact", IDS_SETTINGS_BROWSER_LAYOUT_COMPACT},
        {"browserLayoutVertical", IDS_SETTINGS_BROWSER_LAYOUT_VERTICAL},
        {"tabStripRightAlign", IDS_SETTINGS_TAB_STRIP_RIGHT_ALIGN},
 +      {"verticalTabDensity", IDS_SETTINGS_VERTICAL_TAB_DENSITY},
 +      {"verticalTabDensityCompact", IDS_SETTINGS_VERTICAL_TAB_DENSITY_COMPACT},
++      {"verticalTabDensityComfortable",
++       IDS_SETTINGS_VERTICAL_TAB_DENSITY_COMFORTABLE},
 +      {"verticalTabDensityRoomy", IDS_SETTINGS_VERTICAL_TAB_DENSITY_ROOMY},
        {"browserZenMode", IDS_SETTINGS_BROWSER_ZEN_MODE},
        {"browserZenModeDescription", IDS_SETTINGS_BROWSER_ZEN_MODE_DESCRIPTION},
@@ -286,7 +295,7 @@ Index: src/chrome/common/pref_names.h
      "helium.browser.vertical_right_aligned";
 +
 +// A Local State enum (VerticalTabDensity) pref for vertical tab strip density.
-+// 0 = compact (default), 1 = roomy.
++// 0 = compact (default), 1 = roomy, 2 = comfortable.
 +inline constexpr char kHeliumVerticalTabDensity[] =
 +    "helium.browser.vertical_tab_density";
 
@@ -296,7 +305,7 @@ Index: src/chrome/browser/ui/helium/vertical_tab_density.h
 ===================================================================
 --- /dev/null
 +++ src/chrome/browser/ui/helium/vertical_tab_density.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,62 @@
 +// Copyright 2026 The Helium Authors
 +// You can use, redistribute, and/or modify this source code under
 +// the terms of the GPL-3.0 license that can be found in the LICENSE file.
@@ -312,14 +321,39 @@ Index: src/chrome/browser/ui/helium/vertical_tab_density.h
 +enum class VerticalTabDensity {
 +  kCompact = 0,
 +  kRoomy = 1,
-+  kMaxValue = kRoomy,
++  // Append new values so existing saved Roomy preferences remain valid.
++  kComfortable = 2,
++  kMaxValue = kComfortable,
 +};
 +
 +// Missing or invalid preference values use Compact.
 +constexpr VerticalTabDensity NormalizeVerticalTabDensity(int value) {
-+  return value == static_cast<int>(VerticalTabDensity::kRoomy)
-+             ? VerticalTabDensity::kRoomy
-+             : VerticalTabDensity::kCompact;
++  switch (value) {
++    case static_cast<int>(VerticalTabDensity::kRoomy):
++      return VerticalTabDensity::kRoomy;
++    case static_cast<int>(VerticalTabDensity::kComfortable):
++      return VerticalTabDensity::kComfortable;
++    default:
++      return VerticalTabDensity::kCompact;
++  }
++}
++
++struct VerticalTabDensityMetrics {
++  int tab_height;
++  int vertical_padding;
++};
++
++// Normal rows and pinned tiles share the same density-dependent height.
++constexpr VerticalTabDensityMetrics GetVerticalTabDensityMetrics(
++    VerticalTabDensity density) {
++  switch (density) {
++    case VerticalTabDensity::kComfortable:
++      return {35, 7};
++    case VerticalTabDensity::kRoomy:
++      return {40, 8};
++    default:
++      return {30, 6};
++  }
 +}
 +
 +// Returns the process-wide vertical tab density. GetLayoutConstant() uses this
@@ -536,7 +570,7 @@ Index: src/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
 ===================================================================
 --- src.orig/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
 +++ src/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
-@@ -121,7 +121,7 @@
+@@ -121,10 +121,10 @@
                                                                          : 1.0f),
        static_cast<float>(num_children));
    const int min_height =
@@ -544,4 +578,17 @@ Index: src/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
 +      base::ClampCeil(GetLayoutConstant(LayoutConstant::kVerticalTabPinnedHeight) *
                        min_rows) +
        (num_children > 1 ? kTabPadding : 0);
-   return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth),
+-  return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth),
++  return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabPinnedHeight),
+                    min_height);
+ }
+
+@@ -397,7 +397,7 @@
+       contains_split = true;
+     }
+   }
+-  int child_width = GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) *
++  int child_width = GetLayoutConstant(LayoutConstant::kVerticalTabPinnedHeight) *
+                     (contains_split ? 2 : 1);
+
+   // If the width is bounded, calculate how many children can fit on a row.
