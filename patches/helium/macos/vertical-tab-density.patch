@@ -295,7 +295,7 @@ Index: src/chrome/common/pref_names.h
      "helium.browser.vertical_right_aligned";
 +
 +// A Local State enum (VerticalTabDensity) pref for vertical tab strip density.
-+// 0 = compact (default), 1 = roomy, 2 = comfortable.
++// 0 = compact (default), 1 = roomy.
 +inline constexpr char kHeliumVerticalTabDensity[] =
 +    "helium.browser.vertical_tab_density";
 
