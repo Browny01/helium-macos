@@ -24,6 +24,7 @@ UPSTREAM = 'https://github.com/imputnet/helium-macos.git'
 PROFILE = Path.home() / 'Library/Application Support/net.imput.helium'
 DEST = Path('/Applications/Helium.app')
 PATCH = ROOT / 'patches/helium/macos/vertical-tab-density.patch'
+PASSKEY_ENTITLEMENT = 'com.apple.developer.web-browser.public-key-credential'
 MAGIC = {b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca'}
 
 
@@ -39,6 +40,43 @@ def save(path, data):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(data, indent=2) + '\n')
     temporary.replace(path)
+
+
+def apple_capabilities(app):
+    entitlements = run(['/usr/bin/codesign', '-d', '--entitlements', ':-', app],
+                       capture=True, stderr=subprocess.DEVNULL)
+    values = plistlib.loads(entitlements.encode()) if entitlements else {}
+    signature = run(['/usr/bin/codesign', '-dv', '--verbose=2', app],
+                    capture=True, stderr=subprocess.STDOUT)
+    match = re.search(r'^TeamIdentifier=(.*)$', signature, re.M)
+    team = match[1] if match and match[1] != 'not set' else None
+    return {'team': team,
+            'icloud_passkey_entitlement': bool(values.get(PASSKEY_ENTITLEMENT)) and bool(team),
+            'touch_id_keychain_groups': bool(team) and any(
+                group.endswith('.webauthn') for group in values.get('keychain-access-groups', []))}
+
+
+def prevent_apple_capability_loss(current, candidate):
+    if not current.exists():
+        return
+    before, after = apple_capabilities(current), apple_capabilities(candidate)
+    lost = [name for name in ('icloud_passkey_entitlement', 'touch_id_keychain_groups')
+            if before[name] and not after[name]]
+    if lost:
+        raise RuntimeError('This package would remove Apple passkey/Touch ID capabilities from the '
+                           'installed browser. The existing app was left in place. The fork needs '
+                           'valid Apple signing and approved entitlements before replacing that app.')
+
+
+def doctor():
+    capabilities = apple_capabilities(DEST)
+    print(f'Installed app: {DEST}')
+    print('Apple signing team: ' + (capabilities['team'] or 'none (ad-hoc/local build)'))
+    print('iCloud passkey signing entitlement: ' + ('present' if capabilities['icloud_passkey_entitlement'] else 'missing'))
+    print('Touch ID WebAuthn keychain groups: ' + ('present' if capabilities['touch_id_keychain_groups'] else 'missing'))
+    if not capabilities['icloud_passkey_entitlement']:
+        print('On-Mac Apple passkeys are unavailable in this build. A recompilation alone cannot fix signing approval.')
+    print('iCloud Passwords also requires Apple to accept the browser identity; helper registration alone is insufficient.')
 
 
 def fingerprint():
@@ -376,6 +414,8 @@ def package():
     audit(app)
     save(WORK / 'package.json', {'app': str(app), **manifest})
     print(f'Standalone app ready: {app}')
+    print('Apple compatibility: this ad-hoc package lacks on-Mac Apple passkeys/Touch ID keychain groups, '
+          'and is not accepted as the official Helium identity by the iCloud Passwords helper.')
 
 
 def install():
@@ -384,6 +424,7 @@ def install():
         raise RuntimeError('Package does not match the current fork. Rebuild/package first.')
     app = Path(state['app'])
     audit(app)
+    prevent_apple_capability_loss(DEST, app)
     # Quit every running main Helium process gracefully. Never force-kill the profile.
     processes = run(['ps', '-axo', 'pid=,comm='], capture=True)
     running = [line.strip().split(None, 1) for line in processes.splitlines()
@@ -423,14 +464,14 @@ def install():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['check', 'update', 'build', 'package', 'verify', 'install', 'upgrade', 'adopt-source'])
+    parser.add_argument('command', choices=['check', 'doctor', 'update', 'build', 'package', 'verify', 'install', 'upgrade', 'adopt-source'])
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--source', type=Path, default=ROOT / 'build/src')
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
-    if args.command == 'check':
-        check()
+    if args.command in ('check', 'doctor'):
+        check() if args.command == 'check' else doctor()
         return
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / 'workflow.lock').open('w') as lock:

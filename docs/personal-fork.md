@@ -4,6 +4,43 @@ The everyday app is `/Applications/Helium.app`. It uses the original
 `~/Library/Application Support/net.imput.helium` profile and the normal macOS
 Keychain. No development profile or mock Keychain is used after installation.
 
+## Apple passkeys and iCloud Passwords limitation
+
+The ad-hoc-signed fork does **not** have the officially distributed app's Apple
+signing identity or managed passkey entitlement. It cannot use on-Mac iCloud
+passkeys or the official app's Touch ID WebAuthn keychain groups. WebAuthn can
+still offer a phone/QR-code authenticator. Ordinary browser password encryption
+using the login Keychain is a separate capability.
+
+Apple's iCloud Passwords helper also verifies approved browser identities. Its
+allowlist includes official Helium's `net.imput.helium` identifier paired with
+the imput LLC signing team `S4Q33XPHB4`. The local fork has no signing team and
+does not match that identity. Copying a native-host manifest or rebuilding
+Chromium cannot restore this approval.
+
+Check the installed app with:
+
+```sh
+./fork.sh doctor
+```
+
+A full solution requires legitimate Apple signing and the managed
+`com.apple.developer.web-browser.public-key-credential` entitlement, plus
+acceptance by Apple's Passwords helper. Apple requires an organization account's
+Account Holder to request the browser passkey entitlement. A personal development
+certificate alone is insufficient. The official app's signature cannot be reused
+after modifying its code. An organization account and signing permissions also do
+not grant access to the official app's private Touch ID credential access groups.
+
+For immediate Apple password/passkey compatibility, use the preserved official
+Helium app (which does not have the custom density patch), or Safari. Keep the
+fork and source patch saved if switching your everyday app back to official
+Helium. Installation now stops before replacing an Apple-capable browser with
+an ad-hoc package that removes those entitlements.
+
+Sources: [Apple's passkey entitlement requirements](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.web-browser.public-key-credential)
+and [Apple's browser helper allowlist policy](https://github.com/apple/password-manager-resources#how-apple-uses-web-browser-extension-distribution-information).
+
 ## Check for a new upstream release
 
 From this checkout, run:

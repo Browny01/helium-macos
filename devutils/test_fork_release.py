@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('fork_release', Path(__file__).with_name('fork_release.py'))
 fork = importlib.util.module_from_spec(SPEC)
@@ -88,6 +89,32 @@ class UpdateTests(unittest.TestCase):
             fork.update()
         self.assertEqual(self.git(self.root, 'rev-parse', 'HEAD'), before)
         self.assertEqual(self.patch.read_text(), 'Uncommitted sidebar work\n')
+
+
+class AppleCompatibilityTests(unittest.TestCase):
+    def test_signed_browser_is_preserved_when_replacement_loses_capabilities(self):
+        with tempfile.TemporaryDirectory() as directory:
+            current = Path(directory) / 'Helium.app'
+            current.mkdir()
+            marker = current / 'existing-app'
+            marker.write_text('keep this app')
+            official = {'team': 'OfficialTeam', 'icloud_passkey_entitlement': True,
+                        'touch_id_keychain_groups': True}
+            local = {'team': None, 'icloud_passkey_entitlement': False,
+                     'touch_id_keychain_groups': False}
+            with patch.object(fork, 'apple_capabilities', side_effect=[official, local]):
+                with self.assertRaisesRegex(RuntimeError, 'existing app was left in place'):
+                    fork.prevent_apple_capability_loss(current, Path(directory) / 'replacement.app')
+            self.assertEqual(marker.read_text(), 'keep this app')
+
+    def test_existing_local_fork_can_receive_another_local_update(self):
+        with tempfile.TemporaryDirectory() as directory:
+            current = Path(directory) / 'Helium.app'
+            current.mkdir()
+            local = {'team': None, 'icloud_passkey_entitlement': False,
+                     'touch_id_keychain_groups': False}
+            with patch.object(fork, 'apple_capabilities', return_value=local):
+                fork.prevent_apple_capability_loss(current, Path(directory) / 'replacement.app')
 
 
 if __name__ == '__main__':
